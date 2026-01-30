@@ -1,10 +1,23 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
+import rateLimiter from 'express-rate-limit';
+import mongoose from 'mongoose';
+import { userData } from './schema/userschema.js';
+import { connect } from './mongo_connection/connection.js';
 const app = express();
 const PORT = 3000;
-const userData = [];
+// MongoDB connection
+connect();
+userData();
+const limiter=rateLimiter({
+    windowMs:15*60*1000,
+    max:100,
+    standardHeaders:true,
+    legacyHeaders:false,
+});
+app.use(limiter);
+
 app.set('view engine', 'ejs');
 // recreate __dirname properly
 const __filename = fileURLToPath(import.meta.url);
@@ -14,12 +27,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-app.get('/', (req, res) => {
+app.get('/', limiter, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'Signup.html'));
 });
 
 app.post('/signup', (req, res) => {
-    userData.push(req.body);
+    const { username, email, password } = req.body;
+    const userDataq = new userData({ username, email, password });
+    userData.create(userDataq);
     console.log(userData);
     res.sendFile(path.join(__dirname, 'public', 'Success.html'));
 });
