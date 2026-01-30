@@ -23,6 +23,9 @@ const __dirname = path.dirname(__filename);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
 
 // rate limiter
 const limiter = rateLimit({
@@ -42,7 +45,9 @@ app.post("/signup", async (req, res) => {
 
     const existingUser = await userData.findOne({ email });
     if (existingUser) {
-      return res.status(400).send("User already exists");
+      return res.sendFile(
+  path.join(__dirname, "public", "user-exists.html")
+);
     }
 
     await userData.create({ username, email, password });
@@ -60,10 +65,13 @@ app.post("/login", async (req, res) => {
   const user = await userData.findOne({ email, password });
 
   if (!user) {
-    return res.status(401).send("Invalid credentials");
-  }
+    return res.sendFile(
+  path.join(__dirname, "public", "invalid-credentials.html")
+);
 
-  res.send(`Welcome ${user.username}`);
+  }
+  res.render("welcome", { username: user.username });
+
 });
 
 // start server LAST
