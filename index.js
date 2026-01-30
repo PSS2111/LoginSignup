@@ -36,7 +36,7 @@ app.use(limiter);
 
 // routes
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "Signup.html"));
+  res.sendFile(path.join(__dirname, "public", "signup.html"));
 });
 
 app.post("/signup", async (req, res) => {
@@ -52,7 +52,7 @@ app.post("/signup", async (req, res) => {
 
     await userData.create({ username, email, password });
 
-    res.sendFile(path.join(__dirname, "public", "Success.html"));
+    res.sendFile(path.join(__dirname, "public", "success.html"));
   } catch (err) {
     console.error(err);
     res.status(400).send("Signup failed");
