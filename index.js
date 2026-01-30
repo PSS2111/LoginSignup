@@ -1,54 +1,72 @@
-import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import rateLimiter from 'express-rate-limit';
-import mongoose from 'mongoose';
-import { userData } from './schema/userschema.js';
-import { connect } from './mongo_connection/connection.js';
+import express from "express";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+import rateLimit from "express-rate-limit";
+import { connect } from "./mongo_connection/connection.js";
+import { userData } from "./schema/userschema.js";
+import e from "express";
+
+dotenv.config();
+
+// connect to DB FIRST
+await connect();
+
 const app = express();
-const PORT = 3000;
-// MongoDB connection
-connect();
-userData();
-const limiter=rateLimiter({
-    windowMs:15*60*1000,
-    max:100,
-    standardHeaders:true,
-    legacyHeaders:false,
+const PORT = process.env.PORT || 3000;
+
+// recreate __dirname (ES module)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
+
+// rate limiter
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
 });
 app.use(limiter);
 
-app.set('view engine', 'ejs');
-// recreate __dirname properly
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// localStorage.setItem('userData', JSON.stringify(userData));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-
-app.get('/', limiter, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'Signup.html'));
+// routes
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "Signup.html"));
 });
 
-app.post('/signup', (req, res) => {
+app.post("/signup", async (req, res) => {
+  try {
     const { username, email, password } = req.body;
-    const userDataq = new userData({ username, email, password });
-    userData.create(userDataq);
-    console.log(userData);
-    res.sendFile(path.join(__dirname, 'public', 'Success.html'));
-});
 
-app.post('/login', (req, res) => {
-    const { email, password } = req.body;
-    const user = userData.find(u => u.email === email && u.password === password);
-    if (user) {
-       res.render('LoginSuccess', { name: user.username });
-    } else {
-        res.send('<h2>Login Failed!</h2><p>Invalid email or password.</p>');
+    const existingUser = await userData.findOne({ email });
+    if (existingUser) {
+      return res.status(400).send("User already exists");
     }
+
+    await userData.create({ username, email, password });
+
+    res.sendFile(path.join(__dirname, "public", "Success.html"));
+  } catch (err) {
+    console.error(err);
+    res.status(400).send("Signup failed");
+  }
 });
 
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  const user = await userData.findOne({ email, password });
+
+  if (!user) {
+    return res.status(401).send("Invalid credentials");
+  }
+
+  res.send(`Welcome ${user.username}`);
+});
+
+// start server LAST
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
